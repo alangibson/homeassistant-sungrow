@@ -3,16 +3,23 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from collections.abc import Mapping
 from pprint import pformat
 
 import voluptuous as vol
+from voluptuous import validators
 
 from .SunGather.inverter import SungrowInverter
 
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import (
+    ConfigFlow,
+    ConfigEntry,
+    OptionsFlow
+)
 from homeassistant.helpers.selector import selector
-
+from homeassistant.core import callback
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant.const import (
     CONF_HOST,
     CONF_PORT,
@@ -22,25 +29,49 @@ from homeassistant.const import (
 
 from .const import DOMAIN, DEFAULT_NAME
 
+
 logger = logging.getLogger(__name__)
+
 
 # This is the schema that used to display the UI to the user.
 # TODO add CONF_SCAN_INTERVAL
-DATA_SCHEMA = vol.Schema({
-    vol.Required(CONF_HOST): str,
-    vol.Required(CONF_PORT, default=8082): int,
-    vol.Required(CONF_TIMEOUT, default=3): int,
-    vol.Required(CONF_SLAVE, default=0x01): int,
-    vol.Required("connection", default='http'): selector({
-        "select": {
-            "options": ["http", "modbus", "sungrow"],
-        }
-    }),
-    vol.Optional("model"): str,
-    vol.Optional("use_local_time"): bool,
-    vol.Optional("smart_meter"): bool,
-    vol.Optional("level", default=2): int
-})
+# DATA_SCHEMA = vol.Schema({
+#     vol.Required(CONF_HOST): str,
+#     vol.Required(CONF_PORT, default=8082): int,
+#     vol.Required(CONF_TIMEOUT, default=3): int,
+#     vol.Required(CONF_SLAVE, default=0x01): int,
+#     vol.Required("connection", default='http'): selector({
+#         "select": {
+#             "options": ["http", "modbus", "sungrow"],
+#         }
+#     }),
+#     vol.Optional("model"): str,
+#     vol.Optional("use_local_time"): bool,
+#     vol.Optional("smart_meter"): bool,
+#     vol.Optional("level", default=2): int
+# })
+
+def initDataSchema(options: Mapping[str, Any] = {}):
+    return vol.Schema({
+        vol.Required(CONF_HOST, default=options.get(CONF_HOST)): str,
+        vol.Required(CONF_PORT, default=options.get(CONF_PORT, 8082)): int,
+        vol.Required(CONF_TIMEOUT, default=options.get(CONF_TIMEOUT, 3)): int,
+        vol.Required(CONF_SLAVE, default=options.get(CONF_SLAVE, 0x01)): int,
+        vol.Required("connection", default=options.get('connection', 'http')): selector({
+            "select": {
+                "options": ["http", "modbus", "sungrow"],
+            }
+        }),
+        # FIXME setting model == '' bypasses model detection
+        # TODO validators.Any(str, None)
+        vol.Optional("model", default=options.get('model')): str,
+        vol.Optional("use_local_time", default=options.get('use_local_time', False)): bool,
+        vol.Optional("smart_meter", default=options.get('smart_meter', False)): bool,
+        vol.Optional("level", default=options.get('level', 2)): int
+    })
+
+
+STEP_ID = "user"
 
 
 class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -48,7 +79,7 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    async def validate_input(self, hass: HomeAssistant, config: dict = None) -> dict[str, Any]:
+    async def validate_input(self, hass: HomeAssistant, config: dict = None) -> "dict[str, Any]":
         """Validate the user input allows us to connect.
         Data has the keys from DATA_SCHEMA with values provided by the user.
         """
@@ -66,7 +97,7 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
         logger.debug(f'validate_input creating SungrowInverter')
         inverter: SungrowInverter = SungrowInverter(config)
         logger.debug(f'validate_input inverter={inverter}')
-        
+
         # TODO
         # registersfile = yaml.safe_load(open('registers-sungrow.yaml', encoding="utf-8"))
         # inverter.configure_registers(registersfile)
@@ -93,7 +124,7 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if not user_input:
             logger.debug('async_step_user displaying user data entry form')
-            return self.async_show_form(step_id="user", data_schema=DATA_SCHEMA)
+            return self.async_show_form(step_id=STEP_ID, data_schema=initDataSchema())
         else:
             # Both info and errors are None when config flow is first invoked
             errors = await self.validate_input(self.hass, user_input)
@@ -107,7 +138,36 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
                 # If there is no user input or there were errors, show the form again,
                 # including any errors that were found with the input.
                 logger.debug(
-                    f'async_step_user calling async_show_form step_id="user"')
+                    f'async_step_user calling async_show_form step_id={STEP_ID}')
                 return self.async_show_form(
-                    step_id="user", data_schema=DATA_SCHEMA, errors=errors
+                    step_id=STEP_ID, data_schema=initDataSchema(), errors=errors
                 )
+
+    # https://developers.home-assistant.io/docs/config_entries_options_flow_handler/
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> OptionsFlow:
+        """Create the options flow."""
+        return SungrowInverterOptionsFlow(config_entry)
+
+
+class SungrowInverterOptionsFlow(OptionsFlow):
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, 
+        # TODO user_input: dict[str, Any] | None = None
+        user_input
+    ) -> FlowResult:
+        """Manage the options."""
+        if not user_input:
+            return self.async_show_form(
+                step_id=STEP_ID,
+                data_schema=initDataSchema(self.config_entry.options)
+            )
+        else:
+            return self.async_create_entry(title=DEFAULT_NAME, data=user_input)
