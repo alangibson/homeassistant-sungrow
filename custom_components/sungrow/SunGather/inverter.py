@@ -2,7 +2,12 @@ import logging
 from datetime import datetime
 from SungrowModbusTcpClient import SungrowModbusTcpClient
 from SungrowModbusWebClient import SungrowModbusWebClient
-from pymodbus.client.sync import ModbusTcpClient
+try:
+    # Pymodbus >= 3.0
+    from pymodbus.client import ModbusTcpClient
+except ImportError:
+    # Pymodbus < 3.0
+    from pymodbus.client.sync import ModbusTcpClient
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,7 @@ class SungrowInverter():
                     # Needs to be address -1
                     if self.load_registers(register['type'], register['address'] - 1, 1):
                         if isinstance(self.latest_scrape.get('device_type_code'), int):
+                            # self.inverter_config['model'] = 'Unknown'
                             logger.warning(
                                 f"Unknown Type Code Detected: {self.latest_scrape.get('device_type_code')}")
                         else:
@@ -348,8 +354,9 @@ class SungrowInverter():
                 f'Scraping: {range.get("type")}, {range.get("start")}:{range.get("range")}')
             if not self.load_registers(range.get('type'), int(range.get('start')), int(range.get('range'))):
                 load_registers_failed += 1
+                
+        # If every scrape fails, disconnect the client
         if load_registers_failed == load_registers_count:
-            # If every scrape fails, disconnect the client
             logger.warning('All scrapes failed. Disconnecting client.')
             self.disconnect()
             return False
