@@ -41,8 +41,11 @@ class SungrowInverter():
         if self.client:
             try:
                 return self.client.connect()
-            except:
+            except Exception as e:
+                logger.error('Client failed to connect', exc_info=e)
                 return False
+
+        self.client_config['retries'] = 3
 
         if self.inverter_config['connection'] == "http":
             self.client_config['port'] = '8082'
@@ -62,7 +65,8 @@ class SungrowInverter():
         # Alan: changed to return actual client return value
         try:
             return self.client.connect()
-        except:
+        except Exception as e:
+            logger.error('Client failed to connect', exc_info=e)
             return False
 
     def checkConnection(self):

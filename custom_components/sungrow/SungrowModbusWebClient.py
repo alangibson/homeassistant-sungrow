@@ -1,9 +1,9 @@
-from pymodbus.client import BaseModbusClient
+from pymodbus.client.base import ModbusBaseClient
 from pymodbus.transaction import ModbusSocketFramer, ModbusBinaryFramer
 from pymodbus.factory import ClientDecoder
 from pymodbus.exceptions import ConnectionException
 from websocket import create_connection
-from .version import __version__
+
 
 import requests
 import logging
@@ -17,7 +17,7 @@ import time
 # pass to PyModbus to parse like a standard Modbus RTU message
 # --------------------------------------------------------------------------- #
 
-class SungrowModbusWebClient(BaseModbusClient):
+class SungrowModbusWebClient(ModbusBaseClient):
     """ Implementation of a modbus over Sungrow HTTP client
     """
 
@@ -40,7 +40,7 @@ class SungrowModbusWebClient(BaseModbusClient):
         self.ws_port = port
         self.timeout = kwargs.get('timeout',  '5')
         self.ws_socket = None
-        BaseModbusClient.__init__(self, framer(ClientDecoder(), self), **kwargs)
+        ModbusBaseClient.__init__(self, framer(ClientDecoder(), self), **kwargs)
         
         self.ws_endpoint = "ws://" + str(self.dev_host) + ":" + str(self.ws_port) + "/ws/home/overview"
         self.ws_token = ""
@@ -209,7 +209,7 @@ class SungrowModbusWebClient(BaseModbusClient):
         """ Builds a string representation of the connection
         :returns: The string representation
         """
-        return "SungrowModbusWebClient_%s(%s:%s)" % (__version__, self.dev_host, self.ws_port)
+        return "SungrowModbusWebClient_(%s:%s)" % (self.dev_host, self.ws_port)
 
     def __repr__(self):
         return (

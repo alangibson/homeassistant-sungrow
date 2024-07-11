@@ -34,7 +34,7 @@
         "connection": {
             "options": {
                 "modbus": "MODBUS: Use this when connecting to internal LAN port (preferred)",
-                "sungrow": "MODBUS_Sungrow: Some inverters require this instead of modbus",
+                "sungrow": "MODBUS Encrypted: Some inverters require this instead of modbus",
                 "http": "HTTP: Use this when connecting to WiNet-S (bad idea)"
             }
         }
