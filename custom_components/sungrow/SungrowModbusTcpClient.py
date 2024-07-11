@@ -12,6 +12,7 @@ HEADER = bytes([0x68, 0x68])
 logger = logging.getLogger(__name__)
 
 class SungrowModbusTcpClient(ModbusTcpClient):
+    
     def __init__(self, priv_key=PRIV_KEY, **kwargs):
         ModbusTcpClient.__init__(self, **kwargs)
         self._fifo = bytes()

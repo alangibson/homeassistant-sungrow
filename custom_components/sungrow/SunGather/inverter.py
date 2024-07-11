@@ -48,7 +48,6 @@ class SungrowInverter():
         self.client_config['retries'] = 3
 
         if self.inverter_config['connection'] == "http":
-            self.client_config['port'] = '8082'
             self.client = SungrowModbusWebClient(
                 **self.client_config)
         elif self.inverter_config['connection'] == "sungrow":
@@ -60,7 +59,6 @@ class SungrowInverter():
             logger.warning(
                 f"Inverter: Unknown connection type {self.inverter_config['connection']}, Valid options are http, sungrow or modbus")
             return False
-        logger.info("Connection: " + str(self.client))
 
         # Alan: changed to return actual client return value
         try:
@@ -192,9 +190,10 @@ class SungrowInverter():
                     start, count=count, unit=self.inverter_config['slave'])
             else:
                 raise RuntimeError(f"Unsupported register type: {type}")
-        except Exception:
-            logger.warning(
-                f"No data returned for {register_type}, {start}:{count}")
+        except Exception as e:
+            # logger.warning(
+            #     f"No data returned for {register_type}, {start}:{count}")
+            logger.error(f"No data returned for {register_type}, {start}:{count}", exc_info=e)
             return False
 
         if rr.isError():

@@ -18,11 +18,12 @@ def create_inverter(config_inverter: dict) -> SungrowInverter:
             open(os.path.join(pwd, 'registers-sungrow.yaml'), encoding="utf-8"))
         inverter = SungrowInverter(config_inverter)
         if not inverter.checkConnection():
-            logger.error(
-                f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}")
+            # logger.error(
+            #     f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}")
+            raise Exception(f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}")
         inverter.configure_registers(registersfile)
-        if not inverter.inverter_config['connection'] == "http":
-            inverter.close()
+        # if not inverter.inverter_config['connection'] == "http":
+        #     inverter.close()
         return inverter
     return f
 
