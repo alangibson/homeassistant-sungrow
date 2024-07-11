@@ -37,7 +37,7 @@ class SungrowModbusTcpClient(ModbusTcpClient):
         if (self._key is None) or (self._key_date != date.today()):
            self._restore()
            self.send(GET_KEY)
-           self._key_packet = self._recv(25)
+           self._key_packet = self.recv(25)
            self._pub_key = self._key_packet[9:]
            if (len(self._pub_key) == 16) and (self._pub_key != NO_CRYPTO1) and (self._pub_key != NO_CRYPTO2):
               self._setup()
@@ -75,12 +75,12 @@ class SungrowModbusTcpClient(ModbusTcpClient):
 
     def _recv_decipher(self, size):
         if len(self._fifo) == 0:
-            header = ModbusTcpClient._recv(self, 4)
+            header = ModbusTcpClient.recv(self, 4)
             if header and len(header) == 4:
                packet_len = int(header[2])
                padding = int(header[3])
                length = packet_len + padding
-               encrypted_packet = ModbusTcpClient._recv(self, length)
+               encrypted_packet = ModbusTcpClient.recv(self, length)
                if encrypted_packet and len(encrypted_packet) == length:
                   packet = self._aes_ecb.decrypt(encrypted_packet)
                   packet = self._transactionID + packet[2:]
