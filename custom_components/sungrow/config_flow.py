@@ -61,7 +61,7 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         schema = {
             vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
-            vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 8082)): int,
+            vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 502)): int,
             vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 3)): int,
             vol.Required(CONF_SLAVE, default=user_input.get(CONF_SLAVE, 1)): int,
             vol.Required(

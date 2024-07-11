@@ -1,12 +1,15 @@
 from pymodbus.client import ModbusTcpClient
 from Cryptodome.Cipher import AES
 from datetime import date
+import logging
 
 PRIV_KEY = b'Grow#0*2Sun68CbE'
 NO_CRYPTO1 = b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
 NO_CRYPTO2 = b'\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff'
 GET_KEY = b'\x68\x68\x00\x00\x00\x06\xf7\x04\x0a\xe7\x00\x08'
 HEADER = bytes([0x68, 0x68])
+
+logger = logging.getLogger(__name__)
 
 class SungrowModbusTcpClient(ModbusTcpClient):
     def __init__(self, priv_key=PRIV_KEY, **kwargs):

@@ -192,15 +192,13 @@ class SungrowInverter():
                     start, count=count, unit=self.inverter_config['slave'])
             else:
                 raise RuntimeError(f"Unsupported register type: {type}")
-        except Exception as err:
+        except Exception:
             logger.warning(
                 f"No data returned for {register_type}, {start}:{count}")
-            logger.debug(f"{str(err)}')")
             return False
 
         if rr.isError():
-            logger.warning(f"Modbus connection failed")
-            logger.debug(f"{rr}")
+            logger.warning(f"Failed reading registers: {register_type}, {start}:{count}")
             return False
 
         if not hasattr(rr, 'registers'):

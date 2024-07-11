@@ -95,7 +95,7 @@ async def async_setup_entry(
         # client config
         'host': config_entry.data[CONF_HOST],
         # one of: 502 for modbus, 8082 for http
-        'port': config_entry.data.get(CONF_PORT, '8082'),
+        'port': config_entry.data.get(CONF_PORT, '502'),
         'timeout': int(config_entry.data.get(CONF_TIMEOUT, 10)),
         'retries': 3,
         'slave': config_entry.data.get(CONF_SLAVE, DEFAULT_SLAVE),
