@@ -2,12 +2,7 @@ import logging
 from datetime import datetime
 from SungrowModbusTcpClient import SungrowModbusTcpClient
 from SungrowModbusWebClient import SungrowModbusWebClient
-try:
-    # Pymodbus >= 3.0
-    from pymodbus.client import ModbusTcpClient
-except ImportError:
-    # Pymodbus < 3.0
-    from pymodbus.client.sync import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 
 logger = logging.getLogger(__name__)
 
