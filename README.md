@@ -2,6 +2,9 @@
 
 ## Installation
 
+Make sure your Sungrow inverter firmware is up to date. You can find the latest firmware here:
+https://github.com/sungrow-firmware/firmware
+
 This guide assumes you already have HACS installed.
 
 - Add repository https://github.com/alangibson/homeassistant-sungrow as an Integration repo in HACS Custom Repositories menu
