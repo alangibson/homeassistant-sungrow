@@ -7,14 +7,8 @@ from homeassistant.const import Platform
 
 logger = logging.getLogger(__name__)
 
-
-logger.debug('Sungrow Inverter initializing')
-
-
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Entry point to set up Sungrow Inverter"""
-    logger.debug(
-        f'Sungrow async_setup_entry config_entry.domain={config_entry.domain}')
     # Forward the setup to the sensor platform.
     hass.async_create_task(
         # For platform 'sensor', file sensor.py must exist

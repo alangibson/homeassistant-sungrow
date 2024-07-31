@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class SungrowInverter():
+    
     def __init__(self, config_inverter):
         self.client_config = {
             "host":     config_inverter.get('host'),
@@ -184,10 +185,10 @@ class SungrowInverter():
             logger.debug(f'load_registers: {register_type}, {start}:{count}')
             if register_type == "read":
                 rr = self.client.read_input_registers(
-                    start, count=count, unit=self.inverter_config['slave'])
+                    start, count=count, slave=self.inverter_config['slave'])
             elif register_type == "hold":
                 rr = self.client.read_holding_registers(
-                    start, count=count, unit=self.inverter_config['slave'])
+                    start, count=count, slave=self.inverter_config['slave'])
             else:
                 raise RuntimeError(f"Unsupported register type: {type}")
         except Exception as e:

@@ -22,7 +22,6 @@ from .inverter import connect_inverter
 
 logger = logging.getLogger(__name__)
 
-
 class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
     """Sungrow Inverter config flow."""
 
@@ -54,21 +53,18 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_show_user_form(
         self, user_input: dict[str, Any] = {}, errors: dict = {}
     ):
-        logger.debug(
-            "async_step_user displaying user data entry form "
-            + f"with user_input={user_input} and errors={errors}"
-        )
+        logger.debug("async_step_user displaying user data entry form with user_input=%s and errors=%s" % (user_input, errors))
 
         schema = {
             vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
             vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 502)): int,
-            vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 3)): int,
+            vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 10)): int,
             vol.Required(CONF_SLAVE, default=user_input.get(CONF_SLAVE, 1)): int,
             vol.Required(
                 "connection", default=user_input.get("connection", "modbus")
             ): SelectSelector(
                 SelectSelectorConfig(
-                    options=["modbus", "sungrow", "http"], translation_key="connection"
+                    options=["modbus", "sungrow", "http"],
                 )
             ),
             vol.Optional("model", default=user_input.get("model", "")): str,
@@ -81,6 +77,8 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
             ): bool,
             vol.Optional("level", default=user_input.get("level", 2)): int,
         }
+
+        logger.debug("step_id=%s, data_schema=%s" % ("user", schema))
 
         return self.async_show_form(
             step_id="user",
