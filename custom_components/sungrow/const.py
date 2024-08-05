@@ -36,8 +36,8 @@ SUNGROW_TOTAL_IMPORT_ENERGY = "total_import_energy"
 
 # Battery charged from PV
 # TODO these arent real registers.
-SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY = "daily_battery_charge_energy_from_pv"
-SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY = "total_battery_charge_energy_from_pv"
+SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY = "daily_battery_charge_from_pv"
+SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY = "total_battery_charge_from_pv"
 
 # Battery charged from GRID
 SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY = "daily_charge_energy"
