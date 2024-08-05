@@ -45,6 +45,8 @@ from .const import (
     SUNGROW_EXPORT_POWER,
     SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY,
     SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY,
+    SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY,
+    SUNGROW_TOTAL_BATTERY_CHARGE_GRID_ENERGY,
     SUNGROW_DAILY_PV_ENERGY,
     SUNGROW_TOTAL_PV_ENERGY,
     SUNGROW_DAILY_DIRECT_ENERGY_CONSUMPTION,
@@ -56,7 +58,7 @@ from .const import (
     SUNGROW_DAILY_EXPORT_ENERGY_FROM_PV,
     SUNGROW_TOTAL_EXPORT_ENERGY_FROM_PV,
     SUNGROW_DAILY_EXPORT_ENERGY_FROM_BATTERY,
-    SUNGROW_TOTAL_EXPORT_ENERGY_FROM_BATTERY
+    SUNGROW_TOTAL_EXPORT_ENERGY_FROM_BATTERY    
 )
 
 
@@ -180,6 +182,22 @@ SENSOR_TYPES = (
         device_class=DEVICE_CLASS_ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
+    SungrowInverterSensorEntityDescription(
+        key=SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY ,
+        register=SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY ,
+        name="Daily Battery Charge Energy",
+        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_class=DEVICE_CLASS_ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ),
+    SungrowInverterSensorEntityDescription(
+        key=SUNGROW_TOTAL_BATTERY_CHARGE_GRID_ENERGY ,
+        register=SUNGROW_TOTAL_BATTERY_CHARGE_GRID_ENERGY ,
+        name="Total Battery Charge Energy",
+        native_unit_of_measurement=ENERGY_KILO_WATT_HOUR,
+        device_class=DEVICE_CLASS_ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+    ), 
     SungrowInverterSensorEntityDescription(
         key=SUNGROW_DAILY_DIRECT_ENERGY_CONSUMPTION,
         register=SUNGROW_DAILY_DIRECT_ENERGY_CONSUMPTION,
