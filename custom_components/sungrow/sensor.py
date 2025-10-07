@@ -99,6 +99,7 @@ async def async_setup_entry(
         'timeout': int(config_entry.data.get(CONF_TIMEOUT, 10)),
         'retries': 3,
         'slave': config_entry.data.get(CONF_SLAVE, DEFAULT_SLAVE),
+        'serial_number': config_entry.data.get('serial_number'),
         # inverter config
         # None to autodetect, string of model name otherwise
         'model': config_entry.data.get('model'),
@@ -212,6 +213,6 @@ class SungrowInverterSensorEntity(CoordinatorEntity, SensorEntity):
             else:
                 state = self.coordinator.data.latest_scrape[sensor_type]
         except KeyError:
-            logger.warn(
+            logger.debug(
                 "Sensor lookup value is not available in data array: %s", sensor_type)
         return state

@@ -15,7 +15,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     #     hass.config_entries.async_forward_entry_setups(config_entry, Platform.SENSOR)
     # )
     # return True
-    return await hass.config_entries.async_forward_entry_setups(config_entry, Platform.SENSOR)
+    return await hass.config_entries.async_forward_entry_setups(config_entry, [Platform.SENSOR])
     
 
 # TODO Unload gracefully

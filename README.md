@@ -16,7 +16,7 @@ This guide assumes you already have HACS installed.
 
 - Add the Sungrow integration in the HA Devices and Services menu
 - When prompted, enter the IP address or hostname of your inverter
-    - You can probably leave everything else at the defaults
+  - You can probably leave everything else at the defaults
 
 ## Development
 
@@ -27,19 +27,3 @@ docker-compose up
 ```
 
 and open http://localhost:8123 in your browser.
-
-
-
-## Flows
-
-### Setup Flow
-
-config_flow.async_step_user
-    config_flow._async_show_user_form
-config_flow.async_step_user
-    config_flow.validate_input
-        async_add_executor_job
-            inverter.connect_inverter
-                inverter.create_inverter
-                inverter.scrape
-

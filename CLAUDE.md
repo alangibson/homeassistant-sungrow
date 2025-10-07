@@ -1,0 +1,1 @@
+homeassistant-sungrow is a Home Assistant integration installed via HACS. It supports reading data from Sungrow inverters.

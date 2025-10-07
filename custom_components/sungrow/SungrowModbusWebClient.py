@@ -35,7 +35,7 @@ class SungrowModbusWebClient(ModbusTcpClient):
         self.ws_port = port
         self.timeout = kwargs.get('timeout',  '5')
         self.ws_socket = None
-        ModbusTcpClient.__init__(self, **kwargs)
+        ModbusTcpClient.__init__(self)
         
         self.ws_endpoint = "ws://" + str(self.dev_host) + ":" + str(self.ws_port) + "/ws/home/overview"
         self.ws_token = ""

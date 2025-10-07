@@ -16,7 +16,8 @@
                     "timeout": "Connection timeout",
                     "slave": "MODBUS slave number",
                     "connection": "Connection type",
-                    "model": "Inverter model (Keep empty for auto detection)",
+                    "serial_number": "Serial number (empty for auto detection)",
+                    "model": "Inverter model (empty for auto detection)",
                     "use_local_time": "Use local time?",
                     "smart_meter": "Is a smart meter connected?",
                     "level": "Data request level"
@@ -25,7 +26,8 @@
                     "host": "Note: In case of IP make sure it's static\n",
                     "port": "Note: Port defaults are 8082 for HTTP, 502 for MODBUS\n",
                     "slave": "Note: MODBUS slave number is usually 1 for standalone/master inverters and 2 for slave inverters\n",
-                    "level": "Note: 1 (little detail) to 3 (all available data)\n"
+                    "level": "Note: 1 (little detail) to 3 (all available data)\n",
+                    "serial_number": "Usually required for modbus connections\n"
                 }
             }
         }
