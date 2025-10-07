@@ -10,11 +10,7 @@ logger = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Entry point to set up Sungrow Inverter"""
     # Forward the setup to the sensor platform.
-    hass.async_create_task(
-        # For platform 'sensor', file sensor.py must exist
-        hass.config_entries.async_forward_entry_setup(config_entry, Platform.SENSOR)
-    )
-    return True
+    return await hass.config_entries.async_forward_entry_setup(config_entry, Platform.SENSOR)
 
 
 # TODO Unload gracefully
