@@ -215,4 +215,6 @@ class SungrowInverterSensorEntity(CoordinatorEntity, SensorEntity):
         except KeyError:
             logger.debug(
                 "Sensor lookup value is not available in data array: %s", sensor_type)
+        if state:
+            logger.debug(f'Sensor {sensor_type} value is {state}')
         return state
