@@ -1,6 +1,6 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.framer.socket_framer import ModbusSocketFramer
 from pymodbus.exceptions import ConnectionException
+from pymodbus.framer import Framer
 from websocket import create_connection
 
 
@@ -25,8 +25,7 @@ class SungrowModbusWebClient(ModbusTcpClient):
     # TD_202103_Sungrow Inverter and Compatible Accessories_V1.0: SG5.0/7.0/10/15/20RT
     # https://github.com/bohdan-s/Sungrow-Inverter/blob/main/Install%20Guides/TD_202103_Sungrow%20Inverter%20and%20Compatible%20Accessories_V1.0.pdf
 
-    def __init__(self, host='127.0.0.1', port=8082,
-        framer=ModbusSocketFramer, **kwargs):
+    def __init__(self, host='127.0.0.1', port=8082, **kwargs):
         """ Initialize a client instance
         :param host: The host to connect to (default 127.0.0.1)
         :param port: The websocket port to connect to (default 8082)
@@ -39,8 +38,7 @@ class SungrowModbusWebClient(ModbusTcpClient):
         self.ws_port = port
         self.timeout = kwargs.get('timeout',  '5')
         self.ws_socket = None
-        # ModbusTcpClient.__init__(self, framer(ClientDecoder(), self), **kwargs)
-        ModbusTcpClient.__init__(self, framer, **kwargs)
+        ModbusTcpClient.__init__(self, **kwargs)
         
         self.ws_endpoint = "ws://" + str(self.dev_host) + ":" + str(self.ws_port) + "/ws/home/overview"
         self.ws_token = ""
