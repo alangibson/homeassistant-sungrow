@@ -24,6 +24,34 @@ from .inverter import connect_inverter
 logger = logging.getLogger(__name__)
 
 
+def create_form_schema(user_input: dict[str, Any] = {}):
+    return vol.Schema({
+        vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
+        vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 502)): int,
+        vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 10)): int,
+        vol.Required(CONF_SLAVE, default=user_input.get(CONF_SLAVE, 1)): int,
+        vol.Required(
+            "connection", default=user_input.get("connection", "modbus")
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=["modbus", "sungrow", "http"],
+            )
+        ),
+        vol.Optional(
+            "serial_number", default=user_input.get("serial_number", "")
+        ): str,
+        vol.Optional("model", default=user_input.get("model", "")): str,
+        vol.Optional(
+            "use_local_time",
+            default=user_input.get("use_local_time", False),
+        ): bool,
+        vol.Optional(
+            "smart_meter", default=user_input.get("smart_meter", False)
+        ): bool,
+        vol.Optional("level", default=user_input.get("level", 2)): int,
+    })
+
+
 class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
     """Sungrow Inverter config flow."""
 
@@ -55,48 +83,6 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return (errors, inverter)
 
-    async def _async_show_user_form(
-        self, user_input: dict[str, Any] = {}, errors: dict = {}
-    ):
-        logger.debug(
-            "async_step_user displaying user data entry form with user_input=%s and errors=%s"
-            % (user_input, errors)
-        )
-
-        schema = {
-            vol.Required(CONF_HOST, default=user_input.get(CONF_HOST, "")): str,
-            vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 502)): int,
-            vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 10)): int,
-            vol.Required(CONF_SLAVE, default=user_input.get(CONF_SLAVE, 1)): int,
-            vol.Required(
-                "connection", default=user_input.get("connection", "modbus")
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=["modbus", "sungrow", "http"],
-                )
-            ),
-            vol.Optional(
-                "serial_number", default=user_input.get("serial_number", "")
-            ): str,
-            vol.Optional("model", default=user_input.get("model", "")): str,
-            vol.Optional(
-                "use_local_time",
-                default=user_input.get("use_local_time", False),
-            ): bool,
-            vol.Optional(
-                "smart_meter", default=user_input.get("smart_meter", False)
-            ): bool,
-            vol.Optional("level", default=user_input.get("level", 2)): int,
-        }
-
-        logger.debug("step_id=%s, data_schema=%s" % ("user", schema))
-
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(schema),
-            errors=errors,
-        )
-
     async def async_step_user(self, user_input=None):
         """Initial configuration step
         Either show config data entry form to the user, or create a config entry.
@@ -106,7 +92,10 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         # Either show modal form, or create config entry then move on
         if not user_input:  # Just show the modal form and return if no user input
-            return await self._async_show_user_form()
+            return self.async_show_form(
+                step_id="user",
+                data_schema=create_form_schema(),
+            )
         else:  # We got user input, so do something with it
             # Validate inputs and do a test connection/scrape of the inverter
             # Both info and errors are None when config flow is first invoked
@@ -130,4 +119,27 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 # If there is no user input or there were errors, show the form again,
                 # including any errors that were found with the input.
-                return await self._async_show_user_form(user_input, errors)
+                # return await self._async_show_user_form(user_input, errors)
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=create_form_schema(user_input),
+                    errors=errors,
+                )
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None):
+        logger.debug(f"async_step_reconfigure user_input={pformat(user_input)}")
+        logger.debug(f'{pformat(self._get_reconfigure_entry().data)}')
+
+        if user_input is not None:
+            # Reconfigure may not generate new entities
+            self.async_set_unique_id(user_input.get('serial_number'))
+            self._abort_if_unique_id_mismatch()
+            return self.async_update_reload_and_abort(
+                self._get_reconfigure_entry(),
+                data_updates=user_input,
+            )
+        else:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=create_form_schema(self._get_reconfigure_entry().data),
+            )
