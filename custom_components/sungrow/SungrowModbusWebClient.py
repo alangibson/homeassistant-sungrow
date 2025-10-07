@@ -1,9 +1,6 @@
 from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ConnectionException
-from pymodbus.framer import Framer
 from websocket import create_connection
-
-
 import requests
 import logging
 import json
