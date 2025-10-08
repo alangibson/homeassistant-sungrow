@@ -35,9 +35,8 @@ SUNGROW_DAILY_IMPORT_ENERGY = "daily_import_energy"
 SUNGROW_TOTAL_IMPORT_ENERGY = "total_import_energy"
 
 # Battery charged from PV
-# TODO these arent real registers.
-SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY = "daily_battery_charge_energy_from_pv"
-SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY = "total_battery_charge_energy_from_pv"
+SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY = "daily_battery_charge_from_pv"
+SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY = "total_battery_charge_from_pv"
 
 # Battery charged from GRID
 SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY = "daily_charge_energy"
@@ -63,9 +62,8 @@ SUNGROW_TOTAL_DIRECT_ENERGY_CONSUMPTION = "total_direct_energy_consumption"
 SUNGROW_DAILY_EXPORT_ENERGY = "daily_export_energy"
 SUNGROW_TOTAL_EXPORT_ENERGY = "total_export_energy"
 
-# TODO these arent real registers. Use daily_pv_export, total_pv_export instead?
-SUNGROW_DAILY_EXPORT_ENERGY_FROM_PV = "daily_export_power_from_pv"
-SUNGROW_TOTAL_EXPORT_ENERGY_FROM_PV = "total_export_power_from_pv"
+SUNGROW_DAILY_EXPORT_ENERGY_FROM_PV = "export_power_from_pv_today"
+SUNGROW_TOTAL_EXPORT_ENERGY_FROM_PV = "export_power_from_pv"
 
 SUNGROW_DAILY_EXPORT_ENERGY_FROM_BATTERY = "daily_export_energy"
 SUNGROW_TOTAL_EXPORT_ENERGY_FROM_BATTERY = "total_export_energy"

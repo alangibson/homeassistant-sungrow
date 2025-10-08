@@ -82,11 +82,7 @@ async def async_setup_entry(
 ):
     # Get a unique id for the inverter device
     # unique_id is set during the initial configuration step
-    # if (unique_device_id := config_entry.unique_id) is None:
-    #     # unique_device_id = config_entry.entry_id
-    #     raise Exception('Unique device id is None. This should not be possible.')
     if (unique_device_id := config_entry.data.get('device_id')) is None:
-        # unique_device_id = config_entry.entry_id
         raise Exception('Unique device id is None. This should not be possible.')
 
     """Setup sensors from a config entry created in the integrations UI."""
