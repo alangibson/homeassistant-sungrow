@@ -20,10 +20,23 @@ This guide assumes you already have HACS installed.
 
 ## Development
 
-To test locally, just run
+### Prepare Environment
 
 ```
-docker-compose up
+python3 -m venv venv
+./venv/bin/pip install homeassistant pymodbus==3.11.3
+```
+
+Then follow these instructions to set your VS Code python interpreter to use ./venv
+
+https://code.visualstudio.com/docs/python/environments
+
+### Running
+
+To test locally, the  run
+
+```
+docker compose up
 ```
 
 and open http://localhost:8123 in your browser.

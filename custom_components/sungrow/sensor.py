@@ -74,6 +74,27 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
+def _require_device_identity(inverter, serial_number: str | None) -> tuple[str, str]:
+    """Return inverter serial number and model or raise if identity is incomplete."""
+    if not serial_number and inverter:
+        serial_number = inverter.latest_scrape.get("serial_number")
+
+    model = inverter.getInverterModel() if inverter else None
+    if serial_number and model:
+        return serial_number, model
+
+    logger.error(
+        "Sungrow inverter setup failed: missing required device identity before "
+        "sensor creation (serial_number=%s, model=%s, host=%s)",
+        serial_number,
+        model,
+        inverter.getHost() if inverter else None,
+    )
+    raise RuntimeError(
+        "Sungrow inverter did not report both serial number and model"
+    )
+
+
 # Called automagically by Home Assistant
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -82,15 +103,15 @@ async def async_setup_entry(
 ):
     # Get a unique id for the inverter device
     # unique_id is set during the initial configuration step
-    if (unique_device_id := config_entry.data.get('device_id')) is None:
-        raise Exception('Unique device id is None. This should not be possible.')
+    unique_device_id = config_entry.data.get('device_id') or config_entry.data.get(
+        'serial_number'
+    )
 
     """Setup sensors from a config entry created in the integrations UI."""
     # Configure SungrowInverter
     config_inverter = {
         # client config
         'host': config_entry.data[CONF_HOST],
-        # one of: 502 for modbus, 8082 for http
         'port': config_entry.data.get(CONF_PORT, '502'),
         'timeout': int(config_entry.data.get(CONF_TIMEOUT, 10)),
         'retries': 3,
@@ -108,8 +129,7 @@ async def async_setup_entry(
         # boolean
         'use_local_time': config_entry.data.get('use_local_time', False),
         'smart_meter': config_entry.data.get('smart_meter'),
-        # one of: http, sungrow, modbus
-        'connection': config_entry.data.get('connection', 'http')
+        'use_scan_ranges': config_entry.data.get('use_scan_ranges', False),
     }
 
     # Async construct inverter object
@@ -131,6 +151,9 @@ async def async_setup_entry(
 
     # Fetch data (at least) once via DataUpdateCoordinator
     await coordinator.async_refresh()
+    unique_device_id, inverter_model = _require_device_identity(
+        coordinator.data, unique_device_id
+    )
 
     # Register our inverter device
     device_registry = dr.async_get(hass)
@@ -138,8 +161,8 @@ async def async_setup_entry(
         config_entry_id=config_entry.entry_id,
         identifiers={(DOMAIN, unique_device_id)},
         manufacturer="Sungrow",
-        name=f'Sungrow {coordinator.data.getInverterModel()}',
-        model=coordinator.data.getInverterModel()
+        name=f'Sungrow {inverter_model}',
+        model=inverter_model
     )
 
     # Register our sensor entities
@@ -151,7 +174,7 @@ async def async_setup_entry(
 
         # Add in the owning device's unique id
         description.device_id = unique_device_id
-        description.device_model = coordinator.data.getInverterModel()
+        description.device_model = inverter_model
         model_slug = description.device_model.replace('.', '')
         description.name = f'{model_slug} {unique_device_id} {description.original_name}'
         entities.append(SungrowInverterSensorEntity(coordinator, description))

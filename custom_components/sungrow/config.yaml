@@ -23,7 +23,6 @@ map:
 #  host: 192.168.1.100
 #  timeout: 10
 #  scan_interval: 30
-#  connection: "modbus"
 #  smart_meter: True
 #  custom_mqtt_server: False
 #  log_console: "INFO"
@@ -31,7 +30,6 @@ map:
 #  host: str
 #  timeout: int(3,60)?
 #  scan_interval: int(5,600)?
-#  connection: "list(sungrow|modbus|http)"
 #  smart_meter: bool
 #  custom_mqtt_server: bool
 #  log_console: "list(OFF|INFO|WARNING|ERROR|DEBUG)?"

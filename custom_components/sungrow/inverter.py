@@ -20,10 +20,13 @@ def create_inverter(config_inverter: dict) -> SungrowInverter:
         if not inverter.checkConnection():
             # logger.error(
             #     f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}")
-            raise Exception(f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}")
+            failure_reason = (
+                inverter.last_register_read_failure or "client connection failed"
+            )
+            raise Exception(
+                f"Error: Connection to inverter failed: {config_inverter.get('host')}:{config_inverter.get('port')}: {failure_reason}"
+            )
         inverter.configure_registers(registersfile)
-        # if not inverter.inverter_config['connection'] == "http":
-        #     inverter.close()
         return inverter
     return f
 

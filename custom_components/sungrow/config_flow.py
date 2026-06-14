@@ -9,7 +9,6 @@ import voluptuous as vol
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 from homeassistant.const import (
     CONF_HOST,
     CONF_PORT,
@@ -30,13 +29,6 @@ def create_form_schema(user_input: dict[str, Any] = {}):
         vol.Required(CONF_PORT, default=user_input.get(CONF_PORT, 502)): int,
         vol.Required(CONF_TIMEOUT, default=user_input.get(CONF_TIMEOUT, 10)): int,
         vol.Required(CONF_SLAVE, default=user_input.get(CONF_SLAVE, 1)): int,
-        vol.Required(
-            "connection", default=user_input.get("connection", "modbus")
-        ): SelectSelector(
-            SelectSelectorConfig(
-                options=["modbus", "sungrow", "http"],
-            )
-        ),
         vol.Optional(
             "serial_number", default=user_input.get("serial_number", "")
         ): str,
@@ -132,7 +124,7 @@ class SungrowInverterConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             # Reconfigure may not generate new entities
-            self.async_set_unique_id(user_input.get('serial_number'))
+            await self.async_set_unique_id(user_input.get('serial_number'))
             self._abort_if_unique_id_mismatch()
             return self.async_update_reload_and_abort(
                 self._get_reconfigure_entry(),

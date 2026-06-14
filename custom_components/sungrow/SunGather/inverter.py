@@ -1,13 +1,53 @@
+""" Originally from SunGather """
+
 import logging
 from datetime import datetime
-from ..SungrowModbusTcpClient import SungrowModbusTcpClient
-from ..SungrowModbusWebClient import SungrowModbusWebClient
+from pymodbus.constants import ExcCodes
 from pymodbus.client import ModbusTcpClient
+from pymodbus.pdu.register_message import (
+    ReadHoldingRegistersRequest,
+    ReadInputRegistersRequest,
+)
 
 logger = logging.getLogger(__name__)
 
+FUNCTION_CODE_NAMES = {
+    ReadHoldingRegistersRequest.function_code: ReadHoldingRegistersRequest.__name__,
+    ReadInputRegistersRequest.function_code: ReadInputRegistersRequest.__name__,
+}
+
+
+def decode_modbus_exception_response(response) -> str:
+    """Decode a PyModbus exception response into user-readable details."""
+    exception_function_code = getattr(response, "function_code", None)
+    exception_code = getattr(response, "exception_code", None)
+
+    base_function_code = None
+    if exception_function_code is not None:
+        base_function_code = exception_function_code - 0x80
+
+    function_name = FUNCTION_CODE_NAMES.get(
+        base_function_code,
+        f"Unknown function {base_function_code}",
+    )
+
+    try:
+        exception_name = ExcCodes(exception_code).name
+    except ValueError:
+        exception_name = f"UNKNOWN_EXCEPTION_CODE_{exception_code}"
+
+    return (
+        f"function={function_name} "
+        f"(exception function_code={exception_function_code}, "
+        f"base function_code={base_function_code}), "
+        f"exception={exception_name} (exception_code={exception_code})"
+    )
+
 
 class SungrowInverter:
+    """
+    Represents a single Sungrow inverter
+    """
 
     def __init__(self, config_inverter):
         self.client_config = {
@@ -18,11 +58,12 @@ class SungrowInverter:
         }
         self.inverter_config = {
             "slave": config_inverter.get("slave"),
+            "serial_number": config_inverter.get("serial_number"),
             "model": config_inverter.get("model"),
             "level": config_inverter.get("level"),
             "use_local_time": config_inverter.get("use_local_time"),
             "smart_meter": config_inverter.get("smart_meter"),
-            "connection": config_inverter.get("connection"),
+            "use_scan_ranges": config_inverter.get("use_scan_ranges", False),
         }
         self.client = None
 
@@ -38,6 +79,31 @@ class SungrowInverter:
         self.register_ranges.pop()  # Remove null value from list
 
         self.latest_scrape = {}
+        self.last_register_read_failure = None
+
+    def _record_register_read_failure(self, reason):
+        self.last_register_read_failure = reason
+
+    def _get_connection_log_details(self):
+        serial_number = self.latest_scrape.get(
+            "serial_number", self.inverter_config.get("serial_number")
+        )
+        model = self.latest_scrape.get(
+            "device_type_code", self.inverter_config.get("model")
+        )
+        return serial_number, model
+
+    def _get_register_count(self, register):
+        datatype = register.get("datatype", "")
+        if datatype in ("U32", "S32"):
+            return 2
+        if datatype == "UTF-8":
+            return 10
+        if datatype.startswith("UTF-8["):
+            length = datatype[6:-1]
+            if length.isdigit() and int(length) > 0:
+                return int(length)
+        return 1
 
     def connect(self):
 
@@ -47,26 +113,27 @@ class SungrowInverter:
             self.client_config["retries"] = 3
 
             logger.debug(f"Building client with config={self.inverter_config}")
+            logger.debug("Constructing ModbusTcpClient")
+            self.client = ModbusTcpClient(**self.client_config)
 
-            if self.inverter_config["connection"] == "http":
-                logger.debug("Constructing SungrowModbusWebClient")
-                self.client = SungrowModbusWebClient(**self.client_config)
-            elif self.inverter_config["connection"] == "sungrow":
-                logger.debug("Constructing SungrowModbusTcpClient")
-                self.client = SungrowModbusTcpClient(**self.client_config)
-            elif self.inverter_config["connection"] == "modbus":
-                logger.debug("Constructing ModbusTcpClient")
-                self.client = ModbusTcpClient(**self.client_config)
-            else:
-                logger.warning(
-                    f"Inverter: Unknown connection type {self.inverter_config['connection']}, Valid options are http, sungrow or modbus"
-                )
-                return False
-
+        serial_number, model = self._get_connection_log_details()
+        logger.info(
+            "Connecting to Sungrow inverter at %s:%s (serial_number=%s, model=%s)",
+            self.client_config.get("host"),
+            self.client_config.get("port"),
+            serial_number,
+            model,
+        )
         logger.debug("Running client.connect()")
         try:
-            return self.client.connect()
+            is_connected = self.client.connect()
+            if not is_connected:
+                self._record_register_read_failure(
+                    f"client.connect() returned False for {self.client_config.get('host')}:{self.client_config.get('port')}"
+                )
+            return is_connected
         except Exception as e:
+            self._record_register_read_failure(f"{type(e).__name__}: {e}")
             logger.error("Client failed to connect", exc_info=e)
             return False
 
@@ -180,36 +247,37 @@ class SungrowInverter:
                 else:
                     self.registers.append(register)
 
-        # Load register list based om name and value after checking model
-        for register_range in registersfile["scan"][0]["read"]:
-            register_range_used = False
-            register_range["type"] = "read"
-            for register in self.registers:
-                if register.get("type") == register_range.get("type"):
-                    if register.get("address") >= register_range.get(
-                        "start"
-                    ) and register.get("address") <= (
-                        register_range.get("start") + register_range.get("range")
-                    ):
-                        register_range_used = True
-                        continue
-            if register_range_used:
-                self.register_ranges.append(register_range)
+        if self.inverter_config.get("use_scan_ranges"):
+            # Load register list based om name and value after checking model
+            for register_range in registersfile["scan"][0]["read"]:
+                register_range_used = False
+                register_range["type"] = "read"
+                for register in self.registers:
+                    if register.get("type") == register_range.get("type"):
+                        if register.get("address") >= register_range.get(
+                            "start"
+                        ) and register.get("address") <= (
+                            register_range.get("start") + register_range.get("range")
+                        ):
+                            register_range_used = True
+                            continue
+                if register_range_used:
+                    self.register_ranges.append(register_range)
 
-        for register_range in registersfile["scan"][1]["hold"]:
-            register_range_used = False
-            register_range["type"] = "hold"
-            for register in self.registers:
-                if register.get("type") == register_range.get("type"):
-                    if register.get("address") >= register_range.get(
-                        "start"
-                    ) and register.get("address") <= (
-                        register_range.get("start") + register_range.get("range")
-                    ):
-                        register_range_used = True
-                        continue
-            if register_range_used:
-                self.register_ranges.append(register_range)
+            for register_range in registersfile["scan"][1]["hold"]:
+                register_range_used = False
+                register_range["type"] = "hold"
+                for register in self.registers:
+                    if register.get("type") == register_range.get("type"):
+                        if register.get("address") >= register_range.get(
+                            "start"
+                        ) and register.get("address") <= (
+                            register_range.get("start") + register_range.get("range")
+                        ):
+                            register_range_used = True
+                            continue
+                if register_range_used:
+                    self.register_ranges.append(register_range)
         return True
 
     def load_registers(self, register_type, start, count=100):
@@ -224,22 +292,37 @@ class SungrowInverter:
                     start, count=count, device_id=self.inverter_config["slave"]
                 )
             else:
-                raise RuntimeError(f"Unsupported register type: {type}")
+                raise RuntimeError(f"Unsupported register type: {register_type}")
         except Exception as e:
-            logger.debug(f"No data returned for {register_type}, {start}:{count}. Error: {e}")
+            self._record_register_read_failure(
+                f"{register_type}, {start}:{count}: {type(e).__name__}: {e}"
+            )
+            logger.debug(
+                f"No data returned for {register_type}, {start}:{count}. Error: {e}"
+            )
             return False
 
         if rr.isError():
+            decoded_error = decode_modbus_exception_response(rr)
+            self._record_register_read_failure(
+                f"{register_type}, {start}:{count}: Modbus error response: {decoded_error}"
+            )
             logger.warning(
-                f"Failed reading registers: {register_type}, {start}:{count}"
+                f"Failed reading registers: {register_type}, {start}:{count}: {decoded_error}"
             )
             return False
 
         if not hasattr(rr, "registers"):
+            self._record_register_read_failure(
+                f"{register_type}, {start}:{count}: No registers returned"
+            )
             logger.warning("No registers returned")
             return False
 
         if len(rr.registers) != count:
+            self._record_register_read_failure(
+                f"{register_type}, {start}:{count}: Mismatched number of registers read {len(rr.registers)} != {count}"
+            )
             logger.warning(
                 f"Mismatched number of registers read {len(rr.registers)} != {count}"
             )
@@ -293,8 +376,11 @@ class SungrowInverter:
                             register_value = register_value + u32_value * 0x10000
                     elif register.get("datatype").startswith("UTF-8"):
                         # format: UTF-8[<length>]
-                        length = register.get("datatype")[6:-1]
-                        if (
+                        if register.get("datatype") == "UTF-8":
+                            length = count
+                        else:
+                            length = register.get("datatype")[6:-1]
+                        if not isinstance(length, int) and (
                             not length.isdigit()
                             or not int(length) > 0
                             or not int(length) < 256
@@ -303,9 +389,10 @@ class SungrowInverter:
                                 f"Invalid yaml for {register_name}: expected UTF-8[<length>] with length being a number between 1 and 255, e.g. UTF-8[10]"
                             )
                             return False
-                        if num + int(length) > count:
+                        length = int(length)
+                        if num + length > count:
                             logger.error(
-                                f"Invalid yaml for {register_name}: UTF-8[<length>] doesn't fit into scan ranges (start at {num} + length {int(length)} >= {count})"
+                                f"Invalid yaml for {register_name}: UTF-8[<length>] doesn't fit into scan ranges (start at {num} + length {length} >= {count})"
                             )
                             return False
 
@@ -313,7 +400,7 @@ class SungrowInverter:
                         register_value = "".join(
                             [
                                 chr(c >> 8) + chr(c & 0xFF)
-                                for c in rr.registers[num : num + int(length)]
+                                for c in rr.registers[num : num + length]
                             ]
                         ).strip("\x00")
 
@@ -400,22 +487,42 @@ class SungrowInverter:
         self.latest_scrape["device_type_code"] = self.inverter_config["model"]
         self.latest_scrape["run_state"] = run_state
 
-        # Load all registers from inverer
+        # Load all registers from inverter
         load_registers_count = 0
         load_registers_failed = 0
-        for range in self.register_ranges:
-            load_registers_count += 1
-            logger.debug(
-                f'Scraping: {range.get("type")}, {range.get("start")}:{range.get("range")}'
-            )
-            if not self.load_registers(
-                range.get("type"), int(range.get("start")), int(range.get("range"))
-            ):
-                load_registers_failed += 1
+        if self.inverter_config.get("use_scan_ranges"):
+            for range in self.register_ranges:
+                load_registers_count += 1
+                logger.debug(
+                    f'Scraping: {range.get("type")}, {range.get("start")}:{range.get("range")}'
+                )
+                if not self.load_registers(
+                    range.get("type"), int(range.get("start")), int(range.get("range"))
+                ):
+                    load_registers_failed += 1
+        else:
+            for register in self.registers:
+                load_registers_count += 1
+                register_start = int(register.get("address")) - 1
+                register_count = self._get_register_count(register)
+                logger.debug(
+                    f'Scraping: {register.get("type")}, {register_start}:{register_count}'
+                )
+                if not self.load_registers(
+                    register.get("type"), register_start, register_count
+                ):
+                    load_registers_failed += 1
 
         # If every scrape fails, disconnect the client
         if load_registers_failed == load_registers_count:
-            logger.warning("All register reads failed. Disconnecting client.")
+            logger.warning(
+                "All register reads failed for %s:%s (%s/%s failed). Disconnecting client. Last failure: %s",
+                self.client_config.get("host"),
+                self.client_config.get("port"),
+                load_registers_failed,
+                load_registers_count,
+                self.last_register_read_failure,
+            )
             self.disconnect()
             return False
         if load_registers_failed > 0:
