@@ -1,6 +1,7 @@
 """ Originally from SunGather """
 
 import logging
+from copy import deepcopy
 from datetime import datetime
 from pymodbus.constants import ExcCodes
 from pymodbus.client import ModbusTcpClient
@@ -166,6 +167,7 @@ class SungrowInverter:
         self.client = None
 
     def configure_registers(self, registersfile):
+        registersfile = deepcopy(registersfile)
         # Check model so we can load only valid registers
         if self.inverter_config.get("model"):
             logger.info(
@@ -337,47 +339,27 @@ class SungrowInverter:
 
                     register_value = rr.registers[num]
 
-                    # Convert unsigned to signed
-                    # If xFF / xFFFF then change to 0, looks better when logging / graphing
-                    if register.get("datatype") == "U16":
-                        if register_value == 0xFFFF:
-                            register_value = 0
+                    datatype = register.get("datatype")
+                    if datatype in ("U16", "S16", "U32", "S32"):
+                        width = 32 if datatype.endswith("32") else 16
+                        if width == 32:
+                            if num + 1 >= count:
+                                return False
+                            register_value += rr.registers[num + 1] << 16
+                        # Sungrow invalid sentinels: unsigned max / signed max.
+                        # -1 is a valid signed measurement, e.g. grid power.
+                        invalid = (1 << (width - 1)) - 1 if datatype.startswith("S") else (1 << width) - 1
+                        if register_value == invalid:
+                            self.latest_scrape.pop(register_name, None)
+                            continue
+                        if datatype.startswith("S") and register_value & (1 << (width - 1)):
+                            register_value -= 1 << width
                         if register.get("mask"):
-                            # Filter the value through the mask.
-                            register_value = (
-                                1 if register_value & register.get("mask") != 0 else 0
-                            )
-                    elif register.get("datatype") == "S16":
-                        if register_value == 0xFFFF or register_value == 0x7FFF:
-                            register_value = 0
-                        if (
-                            register_value >= 32767
-                        ):  # Anything greater than 32767 is a negative for 16bit
-                            register_value = register_value - 65536
-                    elif register.get("datatype") == "U32":
-                        u32_value = rr.registers[num + 1]
-                        if register_value == 0xFFFF and u32_value == 0xFFFF:
-                            register_value = 0
-                        else:
-                            register_value = register_value + u32_value * 0x10000
-                    elif register.get("datatype") == "S32":
-                        u32_value = rr.registers[num + 1]
-                        if register_value == 0xFFFF and (
-                            u32_value == 0xFFFF or u32_value == 0x7FFF
-                        ):
-                            register_value = 0
-                        elif (
-                            u32_value >= 32767
-                        ):  # Anything greater than 32767 is a negative
-                            register_value = (
-                                register_value + u32_value * 0x10000 - 0xFFFFFFFF - 1
-                            )
-                        else:
-                            register_value = register_value + u32_value * 0x10000
+                            register_value = int(bool(register_value & register["mask"]))
                     elif register.get("datatype").startswith("UTF-8"):
                         # format: UTF-8[<length>]
                         if register.get("datatype") == "UTF-8":
-                            length = count
+                            length = self._get_register_count(register)
                         else:
                             length = register.get("datatype")[6:-1]
                         if not isinstance(length, int) and (
@@ -475,17 +457,11 @@ class SungrowInverter:
     def scrape(self):
         scrape_start = datetime.now()
 
-        # Clear previous inverter values, keep the model and run state
-        if self.latest_scrape.get("run_state"):
-            run_state = self.latest_scrape.get("run_state")
-        else:
-            run_state = "ON"
-
-        # Alan: Removed because it is not threadsafe
-        # self.latest_scrape = {}
-
-        self.latest_scrape["device_type_code"] = self.inverter_config["model"]
-        self.latest_scrape["run_state"] = run_state
+        # A failed read must not retain a previous poll's measurement.
+        self.latest_scrape = {
+            "device_type_code": self.inverter_config["model"],
+            "serial_number": self.latest_scrape.get("serial_number") or self.inverter_config.get("serial_number"),
+        }
 
         # Load all registers from inverter
         load_registers_count = 0
@@ -530,64 +506,25 @@ class SungrowInverter:
                 f"Scraping: {load_registers_failed}/{load_registers_count} registers failed to scrape"
             )
 
-        # Create a registers for Power imported and exported to/from Grid
-        if self.inverter_config["level"] >= 1:
-            self.latest_scrape["export_to_grid"] = 0
-            self.latest_scrape["import_from_grid"] = 0
-            if self.validateRegister("meter_power"):
-                try:
-                    power = self.latest_scrape.get(
-                        "meter_power", self.latest_scrape.get("export_power", 0)
-                    )
-                    if power < 0:
-                        self.latest_scrape["export_to_grid"] = abs(power)
-                    elif power >= 0:
-                        self.latest_scrape["import_from_grid"] = power
-                except Exception:
-                    pass
-            # in this case we connected to a hybrid inverter and need to use export_power_hybrid
-            # export_power_hybrid is negative in case of importing from the grid
-            elif self.validateRegister("export_power_hybrid"):
-                try:
-                    power = self.latest_scrape.get("export_power_hybrid", 0)
-                    if power < 0:
-                        self.latest_scrape["import_from_grid"] = abs(power)
-                    elif power >= 0:
-                        self.latest_scrape["export_to_grid"] = power
-                except Exception:
-                    pass
+        # Derive grid values only when a current source measurement exists.
+        meter = self.latest_scrape.get("meter_power")
+        hybrid_export = self.latest_scrape.get("export_power_hybrid")
+        if meter is not None:
+            self.latest_scrape["export_to_grid"] = max(-meter, 0)
+            self.latest_scrape["import_from_grid"] = max(meter, 0)
+        elif hybrid_export is not None:
+            self.latest_scrape["export_to_grid"] = max(hybrid_export, 0)
+            self.latest_scrape["import_from_grid"] = max(-hybrid_export, 0)
 
-        # If inverter is returning no data for load_power, we can calculate it manually
-        try:
-            if not self.latest_scrape["load_power"]:
-                self.latest_scrape["load_power"] = int(
-                    self.latest_scrape.get("total_active_power")
-                ) + int(self.latest_scrape.get("meter_power"))
-        except Exception:
-            # Alan added hybrid inverter support
-            # Support hybrid inverters
-            if self.latest_scrape.get("load_power_hybrid"):
-                self.latest_scrape["load_power"] = self.latest_scrape[
-                    "load_power_hybrid"
-                ]
+        if "load_power" not in self.latest_scrape:
+            if "load_power_hybrid" in self.latest_scrape:
+                self.latest_scrape["load_power"] = self.latest_scrape["load_power_hybrid"]
+            elif meter is not None and "total_active_power" in self.latest_scrape:
+                self.latest_scrape["load_power"] = self.latest_scrape["total_active_power"] + meter
 
-        # See if the inverter is running, This is added to inverters so can be read via MQTT etc...
-        # It is also used below, as some registers hold the last value on 'stop' so we need to set to 0
-        # to help with graphing.
-        try:
-            if self.latest_scrape.get("start_stop"):
-                if self.latest_scrape.get(
-                    "start_stop", False
-                ) == "Start" and self.latest_scrape.get("work_state_1", False).contains(
-                    "Run"
-                ):
-                    self.latest_scrape["run_state"] = "ON"
-                else:
-                    self.latest_scrape["run_state"] = "OFF"
-            else:
-                self.latest_scrape["run_state"] = "OFF"
-        except Exception:
-            pass
+        work_state = self.latest_scrape.get("work_state_1")
+        if isinstance(work_state, str):
+            self.latest_scrape["run_state"] = "ON" if "Run" in work_state else "OFF"
 
         if self.inverter_config.get("use_local_time", False):
             self.latest_scrape["timestamp"] = datetime.now().strftime(

@@ -4,6 +4,10 @@ from homeassistant.const import (
     PERCENTAGE,
     UnitOfEnergy,
     UnitOfPower,
+    UnitOfElectricPotential,
+    UnitOfElectricCurrent,
+    UnitOfTemperature,
+    UnitOfFrequency,
 )
 from homeassistant.components.sensor import (
     SensorStateClass,
@@ -53,6 +57,7 @@ from .const import (
 @dataclass
 class SungrowInverterSensorEntityDescription(SensorEntityDescription):
     register: str = None
+    hybrid_only: bool = False
     device_id: str = None
     device_model: str = None
     _original_name: str = None
@@ -118,6 +123,7 @@ SENSOR_TYPES = (
         key=SUNGROW_LOAD_POWER_HYBRID,
         register=SUNGROW_LOAD_POWER_HYBRID,
         name="Current Load Power (Hybrid)",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -134,6 +140,7 @@ SENSOR_TYPES = (
         key=SUNGROW_EXPORT_POWER_HYBRID,
         register=SUNGROW_EXPORT_POWER_HYBRID,
         name="Current Export Power (Hybrid)",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -158,6 +165,7 @@ SENSOR_TYPES = (
         key=SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY,
         register=SUNGROW_DAILY_BATTERY_CHARGE_PV_ENERGY,
         name="Daily Battery Charge PV Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -166,6 +174,7 @@ SENSOR_TYPES = (
         key=SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY,
         register=SUNGROW_TOTAL_BATTERY_CHARGE_PV_ENERGY,
         name="Total Battery Charge PV Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -206,6 +215,7 @@ SENSOR_TYPES = (
         key=SUNGROW_DAILY_BATTERY_DISCHARGE_ENERGY,
         register=SUNGROW_DAILY_BATTERY_DISCHARGE_ENERGY,
         name="Daily Battery Discharge Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -214,6 +224,7 @@ SENSOR_TYPES = (
         key=SUNGROW_TOTAL_BATTERY_DISCHARGE_ENERGY,
         register=SUNGROW_TOTAL_BATTERY_DISCHARGE_ENERGY,
         name="Total Battery Discharge Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -238,6 +249,7 @@ SENSOR_TYPES = (
         key=SUNGROW_DAILY_EXPORT_ENERGY_FROM_BATTERY,
         register=SUNGROW_DAILY_EXPORT_ENERGY_FROM_BATTERY,
         name="Daily Export Energy From Battery",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -246,6 +258,7 @@ SENSOR_TYPES = (
         key=SUNGROW_TOTAL_EXPORT_ENERGY_FROM_BATTERY,
         register=SUNGROW_TOTAL_EXPORT_ENERGY_FROM_BATTERY,
         name="Total Export Energy From Battery",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -254,6 +267,7 @@ SENSOR_TYPES = (
         key=SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY ,
         register=SUNGROW_DAILY_BATTERY_CHARGE_GRID_ENERGY ,
         name="Daily Battery Charge Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -262,6 +276,7 @@ SENSOR_TYPES = (
         key=SUNGROW_TOTAL_BATTERY_CHARGE_GRID_ENERGY ,
         register=SUNGROW_TOTAL_BATTERY_CHARGE_GRID_ENERGY ,
         name="Total Battery Charge Energy",
+        hybrid_only=True,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.TOTAL_INCREASING,
@@ -303,7 +318,6 @@ SENSOR_TYPES = (
         register=SUNGROW_SELF_CONSUMPTION_OF_DAY,
         name="Daily Self Consumption",
         native_unit_of_measurement=PERCENTAGE,
-        device_class=SensorDeviceClass.ENERGY,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     SungrowInverterSensorEntityDescription(
@@ -347,3 +361,61 @@ SENSOR_TYPES = (
         state_class=SensorStateClass.MEASUREMENT,
     )
 )
+
+# Preserve existing keys above; expose the useful input registers that the
+# reader already supports. Selection below uses configured registers, never
+# the values returned by a single (possibly unsuccessful) poll.
+SENSOR_TYPES += tuple(
+    SungrowInverterSensorEntityDescription(
+        key=key, register=key, name=name,
+        native_unit_of_measurement=unit, device_class=device_class,
+        state_class=state_class,
+    )
+    for key, name, unit, device_class, state_class in (
+        ("total_power_yields", "Lifetime Energy Yields", UnitOfEnergy.KILO_WATT_HOUR, SensorDeviceClass.ENERGY, SensorStateClass.TOTAL_INCREASING),
+        ("internal_temperature", "Inverter Temperature", UnitOfTemperature.CELSIUS, SensorDeviceClass.TEMPERATURE, SensorStateClass.MEASUREMENT),
+        ("grid_frequency", "Grid Frequency", UnitOfFrequency.HERTZ, SensorDeviceClass.FREQUENCY, SensorStateClass.MEASUREMENT),
+        *((f"mppt_{n}_{kind}", f"MPPT {n} {kind.title()}", unit, device_class, SensorStateClass.MEASUREMENT)
+          for n in (1, 2) for kind, unit, device_class in (
+              ("voltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE),
+              ("current", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT))),
+        *((f"phase_{phase}_{kind}", f"Phase {phase.upper()} {kind.title()}", unit, device_class, SensorStateClass.MEASUREMENT)
+          for phase in ("a", "b", "c") for kind, unit, device_class in (
+              ("voltage", UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE),
+              ("current", UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT))),
+        ("work_state_1", "Inverter Work State", None, None, None),
+    )
+)
+
+
+def sensor_dependencies(key):
+    """Return physical registers needed by a sensor, including derived power."""
+    return {
+        SUNGROW_ENERGY_GENERATION: ("total_dc_power",),
+        SUNGROW_ARRAY1_ENERGY_GENERATION: ("mppt_1_voltage", "mppt_1_current"),
+        SUNGROW_ARRAY2_ENERGY_GENERATION: ("mppt_2_voltage", "mppt_2_current"),
+        SUNGROW_POWER_EXPORT_TO_GRID: ("export_to_grid",),
+        SUNGROW_POWER_IMPORT_FROM_GRID: ("import_from_grid",),
+    }.get(key, (key,))
+
+
+def supported_sensor_descriptions(inverter):
+    """Filter unsupported and duplicate legacy sensors without changing IDs."""
+    supported = {r["name"] for r in inverter.registers}
+    if "meter_power" in supported or "export_power_hybrid" in supported:
+        supported.update(("export_to_grid", "import_from_grid"))
+    if "load_power_hybrid" in supported or {"meter_power", "total_active_power"} <= supported:
+        supported.add("load_power")
+    # Last description wins for duplicate legacy battery/export keys, keeping
+    # the generic label and the historical unique ID.
+    is_hybrid = inverter.getInverterModel().startswith("SH")
+    descriptions = {description.key: description for description in SENSOR_TYPES
+                    if is_hybrid or not description.hybrid_only}
+    return [d for d in descriptions.values() if set(sensor_dependencies(d.key)) <= supported]
+
+
+def hybrid_only_sensor_keys():
+    """Exclude shared export keys that also represent valid non-battery data."""
+    hybrid = {d.key for d in SENSOR_TYPES if d.hybrid_only}
+    general = {d.key for d in SENSOR_TYPES if not d.hybrid_only}
+    return hybrid - general

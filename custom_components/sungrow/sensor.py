@@ -12,6 +12,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -53,7 +54,8 @@ from .const import (
 )
 
 from .config import (
-    SENSOR_TYPES,
+    supported_sensor_descriptions,
+    hybrid_only_sensor_keys,
     SungrowInverterSensorEntityDescription
 )
 
@@ -150,7 +152,7 @@ async def async_setup_entry(
     )
 
     # Fetch data (at least) once via DataUpdateCoordinator
-    await coordinator.async_refresh()
+    await coordinator.async_config_entry_first_refresh()
     unique_device_id, inverter_model = _require_device_identity(
         coordinator.data, unique_device_id
     )
@@ -166,8 +168,19 @@ async def async_setup_entry(
     )
 
     # Register our sensor entities
+    if inverter_model.startswith("SG"):
+        registry = er.async_get(hass)
+        battery_ids = {f"sungrow_{unique_device_id}_{key}"
+                       for key in hybrid_only_sensor_keys()}
+        for entry in er.async_entries_for_config_entry(registry, config_entry.entry_id):
+            if (entry.platform == DOMAIN and entry.unique_id in battery_ids
+                    and entry.hidden_by is None):
+                registry.async_update_entity(
+                    entry.entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION
+                )
+
     entities = []
-    for DESCRIPTION in SENSOR_TYPES:
+    for DESCRIPTION in supported_sensor_descriptions(inverter):
         # Create a copy, so we don't modify SENSOR_TYPES in place.
         # We cannot have different Sensors use the same SensorEntityDescription.
         description = dataclasses.replace(DESCRIPTION)
@@ -210,6 +223,10 @@ class SungrowInverterSensorEntity(CoordinatorEntity, SensorEntity):
             manufacturer='Sungrow',
             model=self.entity_description.device_model,
         )
+
+    @property
+    def available(self):
+        return super().available and self.native_value is not None
 
     @property
     def native_value(self):

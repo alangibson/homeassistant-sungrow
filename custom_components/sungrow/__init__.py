@@ -15,6 +15,7 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import DEFAULT_SLAVE, DOMAIN
 from .inverter import connect_inverter
@@ -211,6 +212,19 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # Forward the setup to the sensor platform.
     await hass.config_entries.async_forward_entry_setups(config_entry, [Platform.SENSOR])
     return True
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
+) -> bool:
+    """Allow removal only of the legacy empty-identity device with no entities."""
+    if device_entry.identifiers != {(DOMAIN, "")}:
+        return False
+    if device_entry.config_entries != {config_entry.entry_id}:
+        return False
+    return not er.async_entries_for_device(
+        er.async_get(hass), device_entry.id, include_disabled_entities=True
+    )
 
 
 # TODO Unload gracefully
